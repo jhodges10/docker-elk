@@ -1,7 +1,7 @@
 # Elastic stack (ELK) on Docker
 
 [![Join the chat at https://gitter.im/deviantony/docker-elk](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/deviantony/docker-elk?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-[![Elastic Stack version](https://img.shields.io/badge/ELK-7.1.1-blue.svg?style=flat)](https://github.com/deviantony/docker-elk/issues/401)
+[![Elastic Stack version](https://img.shields.io/badge/ELK-7.2.0-blue.svg?style=flat)](https://github.com/deviantony/docker-elk/issues/409)
 [![Build Status](https://api.travis-ci.org/deviantony/docker-elk.svg?branch=master)](https://travis-ci.org/deviantony/docker-elk)
 
 Run the latest version of the [Elastic stack][elk-stack] with Docker and Docker Compose.
@@ -59,9 +59,9 @@ Other available stack variants:
 
 ### Host setup
 
-1. Install [Docker](https://www.docker.com/community-edition#/download) version **17.05+**
-2. Install [Docker Compose](https://docs.docker.com/compose/install/) version **1.6.0+**
-3. Clone this repository
+* [Docker](https://www.docker.com/community-edition#/download) version **17.05+**
+* [Docker Compose](https://docs.docker.com/compose/install/) version **1.6.0+**
+* 1 GB of RAM
 
 By default, the stack exposes the following ports:
 * 5000: Logstash TCP input
@@ -95,7 +95,7 @@ exclusively. Make sure the repository is cloned in one of those locations or fol
 
 ### Bringing up the stack
 
-Start the stack using Docker Compose:
+Clone this repository, then start the stack using Docker Compose:
 
 ```console
 $ docker-compose up
@@ -122,12 +122,16 @@ Although all stack components work out-of-the-box with this user, we strongly re
 users][builtin-users] instead for increased security. Passwords for these users must be initialized:
 
 ```console
-$ docker-compose exec -T elasticsearch 'bin/elasticsearch-setup-passwords' auto --batch
+$ docker-compose exec -T elasticsearch bin/elasticsearch-setup-passwords auto --batch
 ```
 
 Passwords for all 6 built-in users will be randomly generated. Take note of them and replace the `elastic` username with
-`kibana` and `logstash_system` inside the Kibana and Logstash *pipeline* configuration files respectively. See the
+`kibana` and `logstash_system` inside the Kibana and Logstash configuration files respectively. See the
 [Configuration](#configuration) section below.
+
+> :information_source: Do not use the `logstash_system` user inside the Logstash *pipeline* file, it does not have
+> sufficient permissions to create indices. Follow the instructions at [Configuring Security in Logstash][ls-security]
+> to create a user with suitable roles.
 
 Restart Kibana and Logstash to apply the passwords you just wrote to the configuration files.
 
@@ -135,8 +139,13 @@ Restart Kibana and Logstash to apply the passwords you just wrote to the configu
 $ docker-compose restart kibana logstash
 ```
 
-Give Kibana a few seconds to initialize, then access the Kibana web UI by hitting
-[http://localhost:5601](http://localhost:5601) with a web browser and use the following default credentials to login:
+> :information_source: Learn more about the security of the Elastic stack at [Tutorial: Getting started with
+> security][sec-tutorial].
+
+### Injecting data
+
+Give Kibana about a minute to initialize, then access the Kibana web UI by hitting
+[http://localhost:5601](http://localhost:5601) with a web browser and use the following default credentials to log in:
 
 * user: *elastic*
 * password: *\<your generated elastic password>*
@@ -147,6 +156,8 @@ you to send content via TCP:
 ```console
 $ nc localhost 5000 < /path/to/logfile.log
 ```
+
+You can also load the sample data provided by your Kibana installation.
 
 ### Default Kibana index pattern creation
 
@@ -167,7 +178,7 @@ Create an index pattern via the Kibana API:
 ```console
 $ curl -XPOST -D- 'http://localhost:5601/api/saved_objects/index-pattern' \
     -H 'Content-Type: application/json' \
-    -H 'kbn-version: 7.1.1' \
+    -H 'kbn-version: 7.2.0' \
     -u elastic:<your generated elastic password> \
     -d '{"attributes":{"title":"logstash-*","timeFieldName":"@timestamp"}}'
 ```
@@ -189,9 +200,12 @@ You can also specify the options you want to override by setting environment var
 elasticsearch:
 
   environment:
-    network.host: "_non_loopback_"
-    cluster.name: "my-cluster"
+    network.host: _non_loopback_
+    cluster.name: my-cluster
 ```
+
+Please refer to the following documentation page for more details about how to configure Elasticsearch inside Docker
+containers: [Install Elasticsearch with Docker][es-docker].
 
 ### How to configure Kibana
 
@@ -199,12 +213,18 @@ The Kibana default configuration is stored in [`kibana/config/kibana.yml`][confi
 
 It is also possible to map the entire `config` directory instead of a single file.
 
+Please refer to the following documentation page for more details about how to configure Kibana inside Docker
+containers: [Running Kibana on Docker][kbn-docker].
+
 ### How to configure Logstash
 
 The Logstash configuration is stored in [`logstash/config/logstash.yml`][config-ls].
 
 It is also possible to map the entire `config` directory instead of a single file, however you must be aware that
 Logstash will be expecting a [`log4j2.properties`][log4j-props] file for its own logging.
+
+Please refer to the following documentation page for more details about how to configure Logstash inside Docker
+containers: [Configuring Logstash for Docker][ls-docker].
 
 ### How to disable paid features
 
@@ -281,7 +301,7 @@ For example, to increase the maximum JVM Heap Size for Logstash:
 logstash:
 
   environment:
-    LS_JAVA_OPTS: "-Xmx1g -Xms1g"
+    LS_JAVA_OPTS: -Xmx1g -Xms1g
 ```
 
 ### How to enable a remote JMX connection to a service
@@ -297,7 +317,7 @@ Docker host (replace **DOCKER_HOST_IP**):
 logstash:
 
   environment:
-    LS_JAVA_OPTS: "-Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.port=18080 -Dcom.sun.management.jmxremote.rmi.port=18080 -Djava.rmi.server.hostname=DOCKER_HOST_IP -Dcom.sun.management.jmxremote.local.only=false"
+    LS_JAVA_OPTS: -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.ssl=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.port=18080 -Dcom.sun.management.jmxremote.rmi.port=18080 -Djava.rmi.server.hostname=DOCKER_HOST_IP -Dcom.sun.management.jmxremote.local.only=false
 ```
 
 ## Going further
@@ -350,12 +370,18 @@ instead of `elasticsearch`.
 [mac-mounts]: https://docs.docker.com/docker-for-mac/osxfs/
 
 [builtin-users]: https://www.elastic.co/guide/en/x-pack/current/setting-up-authentication.html#built-in-users
+[ls-security]: https://www.elastic.co/guide/en/logstash/current/ls-security.html
+[sec-tutorial]: https://www.elastic.co/guide/en/elastic-stack-overview/current/security-getting-started.html
 
 [connect-kibana]: https://www.elastic.co/guide/en/kibana/current/connect-to-elasticsearch.html
 
 [config-es]: ./elasticsearch/config/elasticsearch.yml
 [config-kbn]: ./kibana/config/kibana.yml
 [config-ls]: ./logstash/config/logstash.yml
+
+[es-docker]: https://www.elastic.co/guide/en/elasticsearch/reference/current/docker.html
+[kbn-docker]: https://www.elastic.co/guide/en/kibana/current/docker.html
+[ls-docker]: https://www.elastic.co/guide/en/logstash/current/docker-config.html
 
 [log4j-props]: https://github.com/elastic/logstash-docker/tree/master/build/logstash/config
 [esuser]: https://github.com/elastic/elasticsearch-docker/blob/c2877ef/.tedi/template/bin/docker-entrypoint.sh#L9-L10
